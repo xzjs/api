@@ -1,0 +1,63 @@
+group 'xzjs'
+version '1.0'
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'application'
+apply plugin: 'docker'
+
+mainClassName = "t.Main"
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath('se.transmode.gradle:gradle-docker:1.2')
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+                "Manifest-Version": 1.0,
+                "Main-Class": "t.Main")
+    }
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    into('assets') {
+        from 'assets'
+    }
+}
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenLocal() //1.优先查找本地maven库，性能最好
+    maven{//2.其次查找aliyun maven库
+        url'http://maven.aliyun.com/nexus/content/groups/public/'
+    }
+    mavenCentral()//3.最后查找maven中央库
+}
+
+dependencies {
+    compile group: 'org.zeromq', name: 'jeromq', version: '0.4.1'
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    compile fileTree(dir: "libs", include: "*.jar")
+}
+
+task buildDocker(type: Docker, dependsOn: build) {
+    push = false
+    applicationName = jar.baseName
+    dockerfile = file('src/main/docker/Dockerfile')
+    doFirst {
+        copy {
+            from jar
+            into stageDir
+        }
+
+        copy{
+            from 'libs/libmsc64.so'
+            into stageDir
+        }
+    }
+}
